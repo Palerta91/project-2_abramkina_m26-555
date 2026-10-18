@@ -121,13 +121,8 @@ def update(
     table_data: list[dict],
     set_clause: dict,
     where_clause: dict,
-    column_types: dict[str, str] | None = None,
 ) -> list[dict] | None:
     """Изменить записи, подходящие под условие where."""
-    if column_types is not None:
-        for column, value in set_clause.items():
-            set_clause[column] = convert_value(value, column_types[column])
-
     for row in table_data:
         if matches_where(row, where_clause):
             row.update(set_clause)

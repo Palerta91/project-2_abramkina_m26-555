@@ -116,15 +116,14 @@ def test_select_returns_all_rows_or_matching_rows(capsys) -> None:
     assert capsys.readouterr().out.count("Функция select выполнилась за") == 2
 
 
-def test_update_changes_matching_rows_and_converts_values() -> None:
+def test_update_changes_matching_rows() -> None:
     """Обновление меняет только запись, совпавшую с where."""
     records = make_records()
 
     result = core.update(
         records,
-        {"age": "29"},
+        {"age": 29},
         {"name": "Sergei"},
-        {"ID": "int", "name": "str", "age": "int", "is_active": "bool"},
     )
 
     assert result is records
