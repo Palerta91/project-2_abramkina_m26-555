@@ -1,0 +1,12 @@
+.venv/
+dist/
+build/
+__pycache__/
+*.py[cod]
+.ruff_cache/
+.pytest_cache/
+.DS_Store
+
+# Файлы с локальными данными базы не добавляются в репозиторий.
+db_meta.json
+data/
