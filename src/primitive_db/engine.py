@@ -6,7 +6,7 @@ from prettytable import PrettyTable
 from prompt_toolkit import prompt
 
 from primitive_db import core, parser
-from primitive_db.constants import META_FILE
+from primitive_db.constants import ID_COLUMN, META_FILE
 from primitive_db.decorators import create_cacher
 from primitive_db.utils import (
     load_metadata,
@@ -32,9 +32,8 @@ def print_help() -> None:
     print("help - справка; exit - выход\n")
 
 
-def convert_clause_values(metadata: dict, table_name: str, clause: dict) -> dict:
+def convert_clause_values(columns: list[dict], clause: dict) -> dict:
     """Привести значения из where или set к типам столбцов."""
-    columns = core.get_columns(metadata, table_name)
     column_types = {column["name"]: column["type"] for column in columns}
     converted_values = {}
 
@@ -45,9 +44,8 @@ def convert_clause_values(metadata: dict, table_name: str, clause: dict) -> dict
     return converted_values
 
 
-def print_records(metadata: dict, table_name: str, records: list[dict]) -> None:
+def print_records(columns: list[dict], records: list[dict]) -> None:
     """Показать записи в виде таблицы."""
-    columns = core.get_columns(metadata, table_name)
     column_names = [column["name"] for column in columns]
     table = PrettyTable()
     table.field_names = column_names
@@ -104,7 +102,10 @@ def handle_insert(tokens: list[str], metadata: dict) -> None:
         return
 
     save_table_data(table_name, result)
-    print(f'Запись с ID={result[-1]["ID"]} успешно добавлена в таблицу "{table_name}".')
+    print(
+        f"Запись с ID={result[-1][ID_COLUMN]} успешно добавлена "
+        f'в таблицу "{table_name}".'
+    )
 
 
 def handle_select(tokens: list[str], metadata: dict) -> None:
@@ -113,18 +114,18 @@ def handle_select(tokens: list[str], metadata: dict) -> None:
         raise ValueError("используйте select from <таблица> [where столбец = значение]")
 
     table_name = tokens[2]
-    core.get_columns(metadata, table_name)
+    columns = core.get_columns(metadata, table_name)
     records = load_table_data(table_name)
     condition = None
     if len(tokens) > 3:
         condition = parser.parse_where_clause(tokens[3:])
-        condition = convert_clause_values(metadata, table_name, condition)
+        condition = convert_clause_values(columns, condition)
 
     # После изменения данных ключ меняется, и выборка вычисляется заново.
     cache_key = json.dumps([table_name, records, condition], sort_keys=True)
     result = cache_result(cache_key, lambda: core.select(records, condition))
     if result is not None:
-        print_records(metadata, table_name, result)
+        print_records(columns, result)
 
 
 def handle_update(tokens: list[str], metadata: dict) -> None:
@@ -135,14 +136,14 @@ def handle_update(tokens: list[str], metadata: dict) -> None:
         )
 
     table_name = tokens[1]
-    # Последние четыре части команды: where столбец = значение.
-    set_tokens = tokens[2:-4]
-    where_tokens = tokens[-4:]
+    set_tokens = tokens[2:6]
+    where_tokens = tokens[6:]
 
     new_values = parser.parse_set_clause(set_tokens)
-    new_values = convert_clause_values(metadata, table_name, new_values)
+    columns = core.get_columns(metadata, table_name)
+    new_values = convert_clause_values(columns, new_values)
     condition = parser.parse_where_clause(where_tokens)
-    condition = convert_clause_values(metadata, table_name, condition)
+    condition = convert_clause_values(columns, condition)
 
     records = load_table_data(table_name)
     result = core.update(records, new_values, condition)
@@ -160,7 +161,8 @@ def handle_delete(tokens: list[str], metadata: dict) -> None:
 
     table_name = tokens[2]
     condition = parser.parse_where_clause(tokens[3:])
-    condition = convert_clause_values(metadata, table_name, condition)
+    columns = core.get_columns(metadata, table_name)
+    condition = convert_clause_values(columns, condition)
     records = load_table_data(table_name)
     result = core.delete(records, condition)
     if result is None:
